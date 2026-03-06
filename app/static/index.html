@@ -91,6 +91,7 @@
   .roll-belt-btn[data-belt="purple"] { --bc: #7c3aed; color: var(--bc); }
   .roll-belt-btn[data-belt="brown"] { --bc: #b45309; color: var(--bc); }
   .roll-belt-btn[data-belt="black"] { --bc: #888; color: var(--bc); }
+  .roll-belt-btn[data-belt="unknown"] { --bc: #444; color: #666; font-style: italic; }
   .roll-belt-btn.selected { background: color-mix(in srgb, var(--bc) 15%, transparent); border-color: var(--bc); }
   .btn-remove-roll { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 3px; transition: all 0.15s; }
   .btn-remove-roll:hover { color: var(--danger); background: rgba(229,62,62,0.1); }
@@ -430,8 +431,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BELT_COLORS = { white:'#c8c8c8', blue:'#3b6fd4', purple:'#7c3aed', brown:'#b45309', black:'#666666' };
+const BELT_COLORS = { white:'#c8c8c8', blue:'#3b6fd4', purple:'#7c3aed', brown:'#b45309', black:'#666666', unknown:'#444444' };
 const BELT_ORDER = ['white','blue','purple','brown','black'];
+const PARTNER_BELT_ORDER = ['unknown','white','blue','purple','brown','black'];
 
 let sessions = [], stats = {}, instructors = [];
 let selectedBelt = 'white', selectedStripe = 0;
@@ -480,7 +482,7 @@ function rollEntryHTML(index, belt, listId) {
     <div class="roll-entry" id="roll-${listId}-${index}">
       <span class="roll-num">#${index+1}</span>
       <div class="roll-belt-selector">
-        ${BELT_ORDER.map(b => `<button class="roll-belt-btn ${belt===b?'selected':''}" data-belt="${b}" onclick="setRollBelt('${listId}',${index},'${b}')">${b.charAt(0).toUpperCase()+b.slice(1)}</button>`).join('')}
+        ${PARTNER_BELT_ORDER.map(b => `<button class="roll-belt-btn ${belt===b?'selected':''}" data-belt="${b}" onclick="setRollBelt('${listId}',${index},'${b}')">${b==='unknown'?'?':b.charAt(0).toUpperCase()+b.slice(1)}</button>`).join('')}
       </div>
       <button class="btn-remove-roll" onclick="removeRoll('${listId}',${index})">×</button>
     </div>`;
@@ -506,13 +508,13 @@ function removeRoll(listId, index) {
 
 function quickAddRolls(n) {
   if (!n || n < 1) return;
-  for (let i = 0; i < n; i++) logRolls.push({ partner_belt: 'white' });
+  for (let i = 0; i < n; i++) logRolls.push({ partner_belt: 'unknown' });
   renderRolls('log');
 }
 
 function editQuickAddRolls(n) {
   if (!n || n < 1) return;
-  for (let i = 0; i < n; i++) editRolls.push({ partner_belt: 'white' });
+  for (let i = 0; i < n; i++) editRolls.push({ partner_belt: 'unknown' });
   renderRolls('edit');
 }
 
@@ -726,11 +728,13 @@ function renderCharts() {
     options:{ ...chartOpts(), cutout:'65%', scales:{x:{display:false},y:{display:false}} }
   });
 
-  const rollBelts = BELT_ORDER.filter(b => (stats.rolls_by_belt?.[b]||0) > 0);
+  const PARTNER_BELT_ORDER_CHART = ['unknown','white','blue','purple','brown','black'];
+  const rollBelts = PARTNER_BELT_ORDER_CHART.filter(b => (stats.rolls_by_belt?.[b]||0) > 0);
+  const rollLabels = rollBelts.map(b => b === 'unknown' ? '?' : b.charAt(0).toUpperCase()+b.slice(1));
   if (charts.rolls) charts.rolls.destroy();
   charts.rolls = new Chart(document.getElementById('chartRolls'), {
     type:'doughnut',
-    data:{ labels:rollBelts, datasets:[{ data:rollBelts.map(b=>stats.rolls_by_belt[b]), backgroundColor:rollBelts.map(b=>BELT_COLORS[b]), borderWidth:2, borderColor:'#111' }] },
+    data:{ labels:rollLabels, datasets:[{ data:rollBelts.map(b=>stats.rolls_by_belt[b]), backgroundColor:rollBelts.map(b=>BELT_COLORS[b]||'#444'), borderWidth:2, borderColor:'#111' }] },
     options:{ ...chartOpts(), cutout:'65%', scales:{x:{display:false},y:{display:false}} }
   });
 

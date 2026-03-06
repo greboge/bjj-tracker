@@ -197,6 +197,7 @@ def get_stats():
     total_minutes = sum(s["duration_minutes"] or 60 for s in sessions)
     total_rolls = len(rolls)
     rolls_by_belt = {b: 0 for b in belt_order}
+    rolls_by_belt['unknown'] = 0
     for r in rolls:
         rolls_by_belt[r["partner_belt"]] = rolls_by_belt.get(r["partner_belt"], 0) + 1
 
