@@ -233,30 +233,11 @@
         </div>
       </div>
 
-      <div class="form-section-title">Your Belt</div>
-      <div class="form-row">
-        <div class="form-group" style="grid-column:1/-1">
-          <label>Belt</label>
-          <div class="belt-selector" id="logBeltSelector">
-            <button class="belt-btn selected" data-belt="white" onclick="selectBelt('white')">White</button>
-            <button class="belt-btn" data-belt="blue" onclick="selectBelt('blue')">Blue</button>
-            <button class="belt-btn" data-belt="purple" onclick="selectBelt('purple')">Purple</button>
-            <button class="belt-btn" data-belt="brown" onclick="selectBelt('brown')">Brown</button>
-            <button class="belt-btn" data-belt="black" onclick="selectBelt('black')">Black</button>
-          </div>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Stripes</label>
-          <div class="stripe-selector" id="logStripeSelector">
-            <button class="num-btn selected" data-val="0" onclick="selectStripe(0)">0</button>
-            <button class="num-btn" data-val="1" onclick="selectStripe(1)">1</button>
-            <button class="num-btn" data-val="2" onclick="selectStripe(2)">2</button>
-            <button class="num-btn" data-val="3" onclick="selectStripe(3)">3</button>
-            <button class="num-btn" data-val="4" onclick="selectStripe(4)">4</button>
-          </div>
-        </div>
+      <div class="form-section-title">Your Belt <span id="logBeltOverride" style="font-family:'DM Sans',sans-serif;font-style:italic;color:var(--accent);letter-spacing:0;text-transform:none;font-size:0.78rem;cursor:pointer;" onclick="switchTab('settings', document.querySelectorAll('.tab')[4])"> — change in Settings</span></div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:12px 16px;">
+        <div id="logBeltBar" style="width:40px;height:10px;border-radius:2px;background:#444;"></div>
+        <span id="logBeltName" style="font-family:'Bebas Neue',sans-serif;letter-spacing:0.08em;font-size:1.1rem;color:var(--text);">WHITE</span>
+        <div style="display:flex;gap:4px;" id="logStripeDots"></div>
       </div>
 
       <div class="form-section-title">Rolls</div>
@@ -348,6 +329,31 @@
 
   <!-- SETTINGS TAB -->
   <div class="section" id="tab-settings">
+    <div class="form-card" style="margin-bottom:20px">
+      <h2>My Belt</h2>
+      <p style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);margin-bottom:20px;">This will be auto-filled on every new session log.</p>
+      <div class="form-group" style="margin-bottom:16px">
+        <label>Belt</label>
+        <div class="belt-selector" id="settingsBeltSelector">
+          <button class="belt-btn selected" data-belt="white" onclick="settingsSelectBelt('white')">White</button>
+          <button class="belt-btn" data-belt="blue" onclick="settingsSelectBelt('blue')">Blue</button>
+          <button class="belt-btn" data-belt="purple" onclick="settingsSelectBelt('purple')">Purple</button>
+          <button class="belt-btn" data-belt="brown" onclick="settingsSelectBelt('brown')">Brown</button>
+          <button class="belt-btn" data-belt="black" onclick="settingsSelectBelt('black')">Black</button>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Stripes</label>
+        <div class="stripe-selector" id="settingsStripeSelector">
+          <button class="num-btn selected" data-val="0" onclick="settingsSelectStripe(0)">0</button>
+          <button class="num-btn" data-val="1" onclick="settingsSelectStripe(1)">1</button>
+          <button class="num-btn" data-val="2" onclick="settingsSelectStripe(2)">2</button>
+          <button class="num-btn" data-val="3" onclick="settingsSelectStripe(3)">3</button>
+          <button class="num-btn" data-val="4" onclick="settingsSelectStripe(4)">4</button>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveMyBelt()">SAVE MY BELT</button>
+    </div>
     <div class="form-card">
       <h2>Instructors</h2>
       <div class="form-row">
@@ -458,15 +464,52 @@ function toast(msg) {
 // Set today's date
 document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
 
+// ── My Belt (persisted in sessionStorage via API) ─────────
+let myBelt = 'white';
+let myStripes = 0;
+
+function loadMyBelt() {
+  const saved = localStorage.getItem('bjj_my_belt');
+  if (saved) {
+    const p = JSON.parse(saved);
+    myBelt = p.belt || 'white';
+    myStripes = p.stripes || 0;
+  }
+  selectedBelt = myBelt;
+  selectedStripe = myStripes;
+  updateLogBeltDisplay();
+  // pre-select in settings
+  document.querySelectorAll('#settingsBeltSelector .belt-btn').forEach(btn => btn.classList.toggle('selected', btn.dataset.belt === myBelt));
+  document.querySelectorAll('#settingsStripeSelector .num-btn').forEach(btn => btn.classList.toggle('selected', +btn.dataset.val === myStripes));
+}
+
+function updateLogBeltDisplay() {
+  document.getElementById('logBeltBar').style.background = BELT_COLORS[selectedBelt] || '#444';
+  document.getElementById('logBeltName').textContent = selectedBelt.toUpperCase();
+  document.getElementById('logStripeDots').innerHTML = Array.from({length:4}, (_,i) =>
+    `<div class="stripe-dot ${i < selectedStripe ? 'active' : ''}"></div>`).join('');
+}
+
+function settingsSelectBelt(b) {
+  myBelt = b; selectedBelt = b;
+  document.querySelectorAll('#settingsBeltSelector .belt-btn').forEach(btn => btn.classList.toggle('selected', btn.dataset.belt === b));
+  updateLogBeltDisplay();
+}
+
+function settingsSelectStripe(n) {
+  myStripes = n; selectedStripe = n;
+  document.querySelectorAll('#settingsStripeSelector .num-btn').forEach(btn => btn.classList.toggle('selected', +btn.dataset.val === n));
+  updateLogBeltDisplay();
+}
+
+function saveMyBelt() {
+  localStorage.setItem('bjj_my_belt', JSON.stringify({ belt: myBelt, stripes: myStripes }));
+  toast('Belt saved! Will auto-fill on new sessions.');
+}
+
 // ── Belt / Stripe selectors ───────────────────────────────
-function selectBelt(b) {
-  selectedBelt = b;
-  document.querySelectorAll('#logBeltSelector .belt-btn').forEach(btn => btn.classList.toggle('selected', btn.dataset.belt === b));
-}
-function selectStripe(n) {
-  selectedStripe = n;
-  document.querySelectorAll('#logStripeSelector .num-btn').forEach(btn => btn.classList.toggle('selected', +btn.dataset.val === n));
-}
+function selectBelt(b) { selectedBelt = b; }
+function selectStripe(n) { selectedStripe = n; }
 function editSelectBelt(b) {
   editBelt = b;
   document.querySelectorAll('#editBeltSelector .belt-btn').forEach(btn => btn.classList.toggle('selected', btn.dataset.belt === b));
@@ -794,6 +837,7 @@ async function loadData() {
 }
 
 async function init() {
+  loadMyBelt();
   await loadInstructors();
   await loadData();
 }
