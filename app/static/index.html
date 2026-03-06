@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BJJ Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222222;
+    --text: #e8e8e8;
+    --muted: #555;
+    --accent: #c8a96e;
+    --danger: #e53e3e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  .app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
+
+  header { padding: 40px 0 30px; border-bottom: 1px solid var(--border); margin-bottom: 36px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .logo { display: flex; align-items: baseline; gap: 12px; }
+  .logo h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2rem,5vw,3rem); letter-spacing: 0.06em; color: var(--accent); line-height: 1; }
+  .logo span { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; }
+
+  .current-belt { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); padding: 10px 18px; border-radius: 4px; }
+  .belt-bar { width: 48px; height: 10px; border-radius: 2px; }
+  .stripe-dots { display: flex; gap: 3px; }
+  .stripe-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: 0.25; }
+  .stripe-dot.active { opacity: 1; }
+  .belt-label { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.08em; font-size: 1rem; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 36px; }
+  .stat-card { background: var(--surface); padding: 20px 24px; transition: background 0.2s; }
+  .stat-card:hover { background: var(--surface2); }
+  .stat-label { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-family: 'DM Mono', monospace; }
+  .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; letter-spacing: 0.04em; color: var(--accent); line-height: 1; }
+  .stat-sub { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: 28px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .tab { padding: 10px 22px; font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 28px; margin-bottom: 32px; }
+  .form-card h2 { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 22px; }
+  .form-section-title { font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 22px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .form-group input, .form-group select, .form-group textarea {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+    padding: 10px 12px; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+  select option { background: #111; }
+
+  .belt-selector { display: flex; gap: 8px; flex-wrap: wrap; }
+  .belt-btn { padding: 8px 14px; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.06em; transition: all 0.15s; background: var(--bg); }
+  .belt-btn[data-belt="white"] { --bc: #e8e8e8; color: var(--bc); }
+  .belt-btn[data-belt="blue"] { --bc: #3b6fd4; color: var(--bc); }
+  .belt-btn[data-belt="purple"] { --bc: #7c3aed; color: var(--bc); }
+  .belt-btn[data-belt="brown"] { --bc: #b45309; color: var(--bc); }
+  .belt-btn[data-belt="black"] { --bc: #888; color: var(--bc); }
+  .belt-btn.selected { background: color-mix(in srgb, var(--bc) 15%, transparent); border-color: var(--bc); }
+
+  .stripe-selector { display: flex; gap: 8px; flex-wrap: wrap; }
+  .num-btn { width: 36px; height: 36px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.85rem; transition: all 0.15s; }
+  .num-btn:hover { border-color: var(--accent); color: var(--text); }
+  .num-btn.selected { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); color: var(--accent); }
+
+  /* Rolls section */
+  .rolls-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .roll-entry { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; }
+  .roll-num { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); min-width: 20px; }
+  .roll-belt-selector { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+  .roll-belt-btn { padding: 5px 10px; border-radius: 3px; border: 1px solid var(--border); cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.04em; transition: all 0.15s; background: var(--bg); }
+  .roll-belt-btn[data-belt="white"] { --bc: #e8e8e8; color: var(--bc); }
+  .roll-belt-btn[data-belt="blue"] { --bc: #3b6fd4; color: var(--bc); }
+  .roll-belt-btn[data-belt="purple"] { --bc: #7c3aed; color: var(--bc); }
+  .roll-belt-btn[data-belt="brown"] { --bc: #b45309; color: var(--bc); }
+  .roll-belt-btn[data-belt="black"] { --bc: #888; color: var(--bc); }
+  .roll-belt-btn.selected { background: color-mix(in srgb, var(--bc) 15%, transparent); border-color: var(--bc); }
+  .btn-remove-roll { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 3px; transition: all 0.15s; }
+  .btn-remove-roll:hover { color: var(--danger); background: rgba(229,62,62,0.1); }
+
+  .rolls-controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .rolls-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rolls-quick-label { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; align-self: center; }
+
+  /* Instructor row */
+  .instructor-row { display: flex; gap: 8px; align-items: flex-end; }
+  .instructor-row select { flex: 1; }
+  .btn-small { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 10px 14px; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 0.72rem; letter-spacing: 0.06em; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn-small:hover { color: var(--accent); border-color: var(--accent); }
+
+  .btn-primary { background: var(--accent); color: #0a0a0a; border: none; padding: 12px 28px; border-radius: 4px; font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s; margin-top: 8px; }
+  .btn-primary:hover { background: #d4b87a; transform: translateY(-1px); }
+  .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 10px 20px; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.06em; cursor: pointer; transition: all 0.15s; }
+  .btn-secondary:hover { color: var(--text); border-color: #444; }
+
+  .sessions-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .session-row { background: var(--surface); padding: 14px 20px; display: flex; align-items: center; gap: 14px; transition: background 0.15s; flex-wrap: wrap; }
+  .session-row:hover { background: var(--surface2); }
+  .session-date { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--muted); min-width: 90px; }
+  .session-belt-badge { padding: 3px 10px; border-radius: 3px; font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid; }
+  .badge-white { color: #c8c8c8; border-color: #c8c8c8; background: rgba(200,200,200,0.08); }
+  .badge-blue { color: #3b6fd4; border-color: #3b6fd4; background: rgba(59,111,212,0.12); }
+  .badge-purple { color: #7c3aed; border-color: #7c3aed; background: rgba(124,58,237,0.12); }
+  .badge-brown { color: #b45309; border-color: #b45309; background: rgba(180,83,9,0.12); }
+  .badge-black { color: #888; border-color: #555; background: rgba(100,100,100,0.1); }
+  .session-stripes { display: flex; gap: 3px; }
+  .s-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.25; }
+  .s-dot.filled { opacity: 1; }
+  .session-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .session-pill { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); background: var(--surface2); padding: 2px 8px; border-radius: 3px; }
+  .session-notes { font-size: 0.82rem; color: var(--muted); flex: 1; min-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .session-actions { display: flex; gap: 8px; margin-left: auto; }
+  .btn-icon { background: none; border: none; cursor: pointer; padding: 4px 8px; color: var(--muted); font-size: 0.8rem; border-radius: 3px; transition: all 0.15s; font-family: 'DM Mono', monospace; }
+  .btn-icon:hover { color: var(--text); background: var(--surface2); }
+  .btn-icon.danger:hover { color: var(--danger); }
+
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 24px; }
+  .chart-card h3 { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 20px; text-transform: uppercase; }
+  .chart-container { position: relative; height: 220px; }
+
+  .timeline { display: flex; flex-direction: column; }
+  .timeline-item { display: flex; align-items: stretch; }
+  .timeline-line-col { display: flex; flex-direction: column; align-items: center; width: 32px; flex-shrink: 0; }
+  .timeline-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg); flex-shrink: 0; margin-top: 14px; z-index: 1; }
+  .timeline-dot.reached { background: var(--accent); border-color: var(--accent); }
+  .timeline-connector { flex: 1; width: 2px; background: var(--border); }
+  .timeline-item:last-child .timeline-connector { display: none; }
+  .timeline-content { flex: 1; padding: 10px 0 20px 16px; }
+  .timeline-belt-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.08em; margin-bottom: 2px; }
+  .timeline-meta { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+
+  .filter-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .filter-row input, .filter-row select { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 8px 14px; font-family: 'DM Mono', monospace; font-size: 0.78rem; outline: none; }
+  .filter-row input { flex: 1; min-width: 180px; }
+  .filter-row input:focus, .filter-row select:focus { border-color: var(--accent); }
+
+  /* Instructors management */
+  .instructor-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-top: 16px; }
+  .instructor-item { background: var(--surface); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .instructor-item:hover { background: var(--surface2); }
+  .instructor-name { font-family: 'DM Mono', monospace; font-size: 0.85rem; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #0a0a0a; padding: 12px 20px; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 0.78rem; letter-spacing: 0.06em; transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 999; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.8rem; letter-spacing: 0.06em; }
+  .empty .big { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--border); letter-spacing: 0.1em; display: block; margin-bottom: 12px; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 28px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+  .modal h2 { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 22px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+  @media (max-width: 600px) {
+    .session-notes { display: none; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <h1>BJJ Tracker</h1>
+      <span>DOJO LOG</span>
+    </div>
+    <div class="current-belt">
+      <div class="belt-bar" id="beltBarColor"></div>
+      <span class="belt-label" id="beltLabelText">—</span>
+      <div class="stripe-dots" id="stripeDots"></div>
+    </div>
+  </header>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total Sessions</div><div class="stat-value" id="statTotal">0</div></div>
+    <div class="stat-card"><div class="stat-label">Mat Time</div><div class="stat-value" id="statHours">0</div><div class="stat-sub">hours logged</div></div>
+    <div class="stat-card"><div class="stat-label">Total Rolls</div><div class="stat-value" id="statRolls">0</div></div>
+    <div class="stat-card"><div class="stat-label">Current Belt</div><div class="stat-value" id="statBelt">—</div></div>
+    <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value" id="statMonth">0</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('log', this)">Log Session</button>
+    <button class="tab" onclick="switchTab('history', this)">History</button>
+    <button class="tab" onclick="switchTab('charts', this)">Charts</button>
+    <button class="tab" onclick="switchTab('progress', this)">Progress</button>
+    <button class="tab" onclick="switchTab('settings', this)">Settings</button>
+  </div>
+
+  <!-- LOG TAB -->
+  <div class="section active" id="tab-log">
+    <div class="form-card">
+      <h2>New Training Session</h2>
+
+      <div class="form-section-title">Session Info</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="inputDate">
+        </div>
+        <div class="form-group">
+          <label>Duration (min)</label>
+          <input type="number" id="inputDuration" placeholder="60" value="60" min="1" max="999">
+        </div>
+        <div class="form-group">
+          <label>Instructor</label>
+          <div class="instructor-row">
+            <select id="inputInstructor">
+              <option value="">— None —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section-title">Your Belt</div>
+      <div class="form-row">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Belt</label>
+          <div class="belt-selector" id="logBeltSelector">
+            <button class="belt-btn selected" data-belt="white" onclick="selectBelt('white')">White</button>
+            <button class="belt-btn" data-belt="blue" onclick="selectBelt('blue')">Blue</button>
+            <button class="belt-btn" data-belt="purple" onclick="selectBelt('purple')">Purple</button>
+            <button class="belt-btn" data-belt="brown" onclick="selectBelt('brown')">Brown</button>
+            <button class="belt-btn" data-belt="black" onclick="selectBelt('black')">Black</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Stripes</label>
+          <div class="stripe-selector" id="logStripeSelector">
+            <button class="num-btn selected" data-val="0" onclick="selectStripe(0)">0</button>
+            <button class="num-btn" data-val="1" onclick="selectStripe(1)">1</button>
+            <button class="num-btn" data-val="2" onclick="selectStripe(2)">2</button>
+            <button class="num-btn" data-val="3" onclick="selectStripe(3)">3</button>
+            <button class="num-btn" data-val="4" onclick="selectStripe(4)">4</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section-title">Rolls</div>
+      <div class="rolls-controls">
+        <span class="rolls-quick-label">Quick add:</span>
+        <div class="rolls-quick">
+          <button class="num-btn" onclick="quickAddRolls(1)">1</button>
+          <button class="num-btn" onclick="quickAddRolls(2)">2</button>
+          <button class="num-btn" onclick="quickAddRolls(3)">3</button>
+          <button class="num-btn" onclick="quickAddRolls(4)">4</button>
+          <button class="num-btn" onclick="quickAddRolls(5)">5</button>
+          <button class="num-btn" onclick="quickAddRolls(6)">6</button>
+          <button class="num-btn" onclick="quickAddRolls(7)">7</button>
+          <button class="num-btn" onclick="quickAddRolls(8)">8</button>
+          <button class="num-btn" onclick="quickAddRolls(9)">9</button>
+          <button class="num-btn" onclick="quickAddRolls(10)">10</button>
+          <input type="number" id="customRollCount" placeholder="+" min="1" max="50" style="width:52px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:6px 8px;font-family:'DM Mono',monospace;font-size:0.8rem;outline:none;" onchange="quickAddRolls(parseInt(this.value)||0); this.value=''">
+        </div>
+      </div>
+      <div class="rolls-list" id="rollsList"></div>
+
+      <div class="form-section-title">Notes</div>
+      <div class="form-row">
+        <div class="form-group" style="grid-column:1/-1">
+          <textarea id="inputNotes" placeholder="What did you work on today?"></textarea>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="submitSession()">LOG SESSION</button>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div class="section" id="tab-history">
+    <div class="filter-row">
+      <input type="text" id="searchInput" placeholder="Search notes..." oninput="renderHistory()">
+      <select id="filterBelt" onchange="renderHistory()" style="background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:8px 12px;font-family:'DM Mono',monospace;font-size:0.78rem;outline:none;">
+        <option value="">All Belts</option>
+        <option value="white">White</option>
+        <option value="blue">Blue</option>
+        <option value="purple">Purple</option>
+        <option value="brown">Brown</option>
+        <option value="black">Black</option>
+      </select>
+    </div>
+    <div class="sessions-list" id="sessionsList">
+      <div class="empty"><span class="big">OSS</span>No sessions yet.</div>
+    </div>
+  </div>
+
+  <!-- CHARTS TAB -->
+  <div class="section" id="tab-charts">
+    <div class="charts-grid">
+      <div class="chart-card" style="grid-column:1/-1">
+        <h3>Sessions Per Month</h3>
+        <div class="chart-container"><canvas id="chartMonthly"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Sessions By Belt</h3>
+        <div class="chart-container"><canvas id="chartBelt"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Rolls By Partner Belt</h3>
+        <div class="chart-container"><canvas id="chartRolls"></canvas></div>
+      </div>
+      <div class="chart-card" style="grid-column:1/-1">
+        <h3>Cumulative Sessions</h3>
+        <div class="chart-container"><canvas id="chartCumulative"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS TAB -->
+  <div class="section" id="tab-progress">
+    <div class="chart-card" style="margin-bottom:20px">
+      <h3>Belt Journey</h3>
+      <div class="timeline" id="beltTimeline"></div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Sessions Per Belt</h3>
+        <div class="chart-container"><canvas id="chartBeltProgress"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Avg Sessions / Month Per Belt</h3>
+        <div class="chart-container"><canvas id="chartBeltAvg"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="section" id="tab-settings">
+    <div class="form-card">
+      <h2>Instructors</h2>
+      <div class="form-row">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Add New Instructor</label>
+          <div style="display:flex;gap:10px">
+            <input type="text" id="newInstructorName" placeholder="Instructor name" style="flex:1">
+            <button class="btn-primary" style="margin-top:0" onclick="addInstructor()">ADD</button>
+          </div>
+        </div>
+      </div>
+      <div class="instructor-list" id="instructorList">
+        <div class="empty" style="padding:30px"><span>No instructors added yet.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>Edit Session</h2>
+    <input type="hidden" id="editId">
+    <div class="form-section-title">Session Info</div>
+    <div class="form-row">
+      <div class="form-group"><label>Date</label><input type="date" id="editDate"></div>
+      <div class="form-group"><label>Duration (min)</label><input type="number" id="editDuration" placeholder="60"></div>
+      <div class="form-group">
+        <label>Instructor</label>
+        <select id="editInstructor"><option value="">— None —</option></select>
+      </div>
+    </div>
+    <div class="form-section-title">Your Belt</div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Belt</label>
+      <div class="belt-selector" id="editBeltSelector">
+        <button class="belt-btn" data-belt="white" onclick="editSelectBelt('white')">White</button>
+        <button class="belt-btn" data-belt="blue" onclick="editSelectBelt('blue')">Blue</button>
+        <button class="belt-btn" data-belt="purple" onclick="editSelectBelt('purple')">Purple</button>
+        <button class="belt-btn" data-belt="brown" onclick="editSelectBelt('brown')">Brown</button>
+        <button class="belt-btn" data-belt="black" onclick="editSelectBelt('black')">Black</button>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Stripes</label>
+      <div class="stripe-selector" id="editStripeSelector">
+        <button class="num-btn" data-val="0" onclick="editSelectStripe(0)">0</button>
+        <button class="num-btn" data-val="1" onclick="editSelectStripe(1)">1</button>
+        <button class="num-btn" data-val="2" onclick="editSelectStripe(2)">2</button>
+        <button class="num-btn" data-val="3" onclick="editSelectStripe(3)">3</button>
+        <button class="num-btn" data-val="4" onclick="editSelectStripe(4)">4</button>
+      </div>
+    </div>
+    <div class="form-section-title">Rolls</div>
+    <div class="rolls-controls" style="margin-bottom:10px">
+      <span class="rolls-quick-label">Quick add:</span>
+      <div class="rolls-quick">
+        <button class="num-btn" onclick="editQuickAddRolls(1)">1</button>
+        <button class="num-btn" onclick="editQuickAddRolls(2)">2</button>
+        <button class="num-btn" onclick="editQuickAddRolls(3)">3</button>
+        <button class="num-btn" onclick="editQuickAddRolls(4)">4</button>
+        <button class="num-btn" onclick="editQuickAddRolls(5)">5</button>
+        <button class="num-btn" onclick="editQuickAddRolls(6)">6</button>
+        <button class="num-btn" onclick="editQuickAddRolls(7)">7</button>
+        <button class="num-btn" onclick="editQuickAddRolls(8)">8</button>
+        <button class="num-btn" onclick="editQuickAddRolls(9)">9</button>
+        <button class="num-btn" onclick="editQuickAddRolls(10)">10</button>
+        <input type="number" placeholder="+" min="1" max="50" style="width:52px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:6px 8px;font-family:'DM Mono',monospace;font-size:0.8rem;outline:none;" onchange="editQuickAddRolls(parseInt(this.value)||0); this.value=''">
+      </div>
+    </div>
+    <div class="rolls-list" id="editRollsList"></div>
+    <div class="form-section-title" style="margin-top:16px">Notes</div>
+    <div class="form-group" style="margin-bottom:14px"><textarea id="editNotes"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" style="margin-top:0" onclick="saveEdit()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BELT_COLORS = { white:'#c8c8c8', blue:'#3b6fd4', purple:'#7c3aed', brown:'#b45309', black:'#666666' };
+const BELT_ORDER = ['white','blue','purple','brown','black'];
+
+let sessions = [], stats = {}, instructors = [];
+let selectedBelt = 'white', selectedStripe = 0;
+let editBelt = 'white', editStripe = 0;
+let logRolls = [], editRolls = [];
+let charts = {};
+
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('/api' + path, opts);
+  return r.json();
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Set today's date
+document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
+
+// ── Belt / Stripe selectors ───────────────────────────────
+function selectBelt(b) {
+  selectedBelt = b;
+  document.querySelectorAll('#logBeltSelector .belt-btn').forEach(btn => btn.classList.toggle('selected', btn.dataset.belt === b));
+}
+function selectStripe(n) {
+  selectedStripe = n;
+  document.querySelectorAll('#logStripeSelector .num-btn').forEach(btn => btn.classList.toggle('selected', +btn.dataset.val === n));
+}
+function editSelectBelt(b) {
+  editBelt = b;
+  document.querySelectorAll('#editBeltSelector .belt-btn').forEach(btn => btn.classList.toggle('selected', btn.dataset.belt === b));
+}
+function editSelectStripe(n) {
+  editStripe = n;
+  document.querySelectorAll('#editStripeSelector .num-btn').forEach(btn => btn.classList.toggle('selected', +btn.dataset.val === n));
+}
+
+// ── Rolls ─────────────────────────────────────────────────
+function rollEntryHTML(index, belt, listId) {
+  return `
+    <div class="roll-entry" id="roll-${listId}-${index}">
+      <span class="roll-num">#${index+1}</span>
+      <div class="roll-belt-selector">
+        ${BELT_ORDER.map(b => `<button class="roll-belt-btn ${belt===b?'selected':''}" data-belt="${b}" onclick="setRollBelt('${listId}',${index},'${b}')">${b.charAt(0).toUpperCase()+b.slice(1)}</button>`).join('')}
+      </div>
+      <button class="btn-remove-roll" onclick="removeRoll('${listId}',${index})">×</button>
+    </div>`;
+}
+
+function renderRolls(listId) {
+  const arr = listId === 'log' ? logRolls : editRolls;
+  const el = document.getElementById(listId === 'log' ? 'rollsList' : 'editRollsList');
+  el.innerHTML = arr.map((r,i) => rollEntryHTML(i, r.partner_belt, listId)).join('');
+}
+
+function setRollBelt(listId, index, belt) {
+  const arr = listId === 'log' ? logRolls : editRolls;
+  arr[index].partner_belt = belt;
+  renderRolls(listId);
+}
+
+function removeRoll(listId, index) {
+  if (listId === 'log') logRolls.splice(index, 1);
+  else editRolls.splice(index, 1);
+  renderRolls(listId);
+}
+
+function quickAddRolls(n) {
+  if (!n || n < 1) return;
+  for (let i = 0; i < n; i++) logRolls.push({ partner_belt: 'white' });
+  renderRolls('log');
+}
+
+function editQuickAddRolls(n) {
+  if (!n || n < 1) return;
+  for (let i = 0; i < n; i++) editRolls.push({ partner_belt: 'white' });
+  renderRolls('edit');
+}
+
+// ── Instructors ───────────────────────────────────────────
+function populateInstructorSelects() {
+  const opts = `<option value="">— None —</option>` + instructors.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
+  document.getElementById('inputInstructor').innerHTML = opts;
+  document.getElementById('editInstructor').innerHTML = opts;
+}
+
+function renderInstructorList() {
+  const el = document.getElementById('instructorList');
+  if (!instructors.length) {
+    el.innerHTML = '<div class="empty" style="padding:30px">No instructors added yet.</div>';
+    return;
+  }
+  el.innerHTML = instructors.map(i => `
+    <div class="instructor-item">
+      <span class="instructor-name">${i.name}</span>
+      <button class="btn-icon danger" onclick="deleteInstructor(${i.id})">del</button>
+    </div>`).join('');
+}
+
+async function addInstructor() {
+  const name = document.getElementById('newInstructorName').value.trim();
+  if (!name) return;
+  await api('/instructors', 'POST', { name });
+  document.getElementById('newInstructorName').value = '';
+  await loadInstructors();
+  toast(`Instructor "${name}" added`);
+}
+
+async function deleteInstructor(id) {
+  if (!confirm('Remove this instructor?')) return;
+  await api('/instructors/' + id, 'DELETE');
+  await loadInstructors();
+  toast('Instructor removed');
+}
+
+async function loadInstructors() {
+  instructors = await api('/instructors');
+  populateInstructorSelects();
+  renderInstructorList();
+}
+
+// ── Submit session ────────────────────────────────────────
+async function submitSession() {
+  const date = document.getElementById('inputDate').value;
+  const duration = document.getElementById('inputDuration').value;
+  const notes = document.getElementById('inputNotes').value;
+  const instructor_id = document.getElementById('inputInstructor').value;
+  if (!date) return toast('Pick a date!');
+  await api('/sessions', 'POST', {
+    date, belt: selectedBelt, stripes: selectedStripe,
+    duration_minutes: duration ? parseInt(duration) : 60,
+    notes: notes || null,
+    instructor_id: instructor_id ? parseInt(instructor_id) : null,
+    rolls: logRolls
+  });
+  document.getElementById('inputNotes').value = '';
+  document.getElementById('inputDuration').value = '60';
+  document.getElementById('inputInstructor').value = '';
+  logRolls = [];
+  renderRolls('log');
+  toast('Session logged! OSS 🥋');
+  await loadData();
+}
+
+// ── Delete session ────────────────────────────────────────
+async function deleteSession(id) {
+  if (!confirm('Delete this session?')) return;
+  await api('/sessions/' + id, 'DELETE');
+  toast('Session deleted');
+  await loadData();
+}
+
+// ── Edit modal ────────────────────────────────────────────
+function openEdit(s) {
+  document.getElementById('editId').value = s.id;
+  document.getElementById('editDate').value = s.date;
+  document.getElementById('editDuration').value = s.duration_minutes || 60;
+  document.getElementById('editNotes').value = s.notes || '';
+  document.getElementById('editInstructor').value = s.instructor_id || '';
+  editSelectBelt(s.belt);
+  editSelectStripe(s.stripes);
+  editRolls = (s.rolls || []).map(r => ({ partner_belt: r.partner_belt }));
+  renderRolls('edit');
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('editModal').classList.remove('open'); }
+
+async function saveEdit() {
+  const id = document.getElementById('editId').value;
+  const date = document.getElementById('editDate').value;
+  const duration = document.getElementById('editDuration').value;
+  const notes = document.getElementById('editNotes').value;
+  const instructor_id = document.getElementById('editInstructor').value;
+  await api('/sessions/' + id, 'PUT', {
+    date, belt: editBelt, stripes: editStripe,
+    duration_minutes: duration ? parseInt(duration) : 60,
+    notes: notes || null,
+    instructor_id: instructor_id ? parseInt(instructor_id) : null,
+    rolls: editRolls
+  });
+  closeModal();
+  toast('Session updated');
+  await loadData();
+}
+
+// ── Tab switching ─────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'charts') renderCharts();
+  if (name === 'progress') renderProgress();
+}
+
+// ── Header / stats ────────────────────────────────────────
+function updateHeader(s) {
+  document.getElementById('beltBarColor').style.background = BELT_COLORS[s.current_belt] || '#444';
+  document.getElementById('beltLabelText').textContent = s.current_belt.toUpperCase();
+  document.getElementById('stripeDots').innerHTML = Array.from({length:4}, (_,i) =>
+    `<div class="stripe-dot ${i < s.current_stripes ? 'active' : ''}"></div>`).join('');
+}
+
+function updateStats(s) {
+  document.getElementById('statTotal').textContent = s.total_sessions;
+  document.getElementById('statHours').textContent = Math.round(s.total_minutes / 60 * 10) / 10;
+  document.getElementById('statRolls').textContent = s.total_rolls || 0;
+  document.getElementById('statBelt').textContent = s.current_belt.toUpperCase();
+  const thisMonth = new Date().toISOString().slice(0,7);
+  document.getElementById('statMonth').textContent = s.monthly_sessions[thisMonth] || 0;
+}
+
+// ── History ───────────────────────────────────────────────
+function getInstructorName(id) {
+  const i = instructors.find(x => x.id === id);
+  return i ? i.name : null;
+}
+
+function renderHistory() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const filterBelt = document.getElementById('filterBelt').value;
+  const filtered = sessions.filter(s => {
+    const matchSearch = !search || (s.notes||'').toLowerCase().includes(search);
+    const matchBelt = !filterBelt || s.belt === filterBelt;
+    return matchSearch && matchBelt;
+  });
+  const list = document.getElementById('sessionsList');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty"><span class="big">OSS</span>No sessions found.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(s => {
+    const instr = getInstructorName(s.instructor_id);
+    const rollCount = (s.rolls||[]).length;
+    return `
+      <div class="session-row">
+        <span class="session-date">${s.date}</span>
+        <span class="session-belt-badge badge-${s.belt}">${s.belt}</span>
+        <div class="session-stripes">
+          ${Array.from({length:4},(_,i)=>`<div class="s-dot ${i<s.stripes?'filled':''}"></div>`).join('')}
+        </div>
+        <div class="session-meta">
+          ${s.duration_minutes ? `<span class="session-pill">${s.duration_minutes}min</span>` : ''}
+          ${rollCount ? `<span class="session-pill">${rollCount} roll${rollCount!==1?'s':''}</span>` : ''}
+          ${instr ? `<span class="session-pill">${instr}</span>` : ''}
+        </div>
+        ${s.notes ? `<span class="session-notes">${s.notes}</span>` : ''}
+        <div class="session-actions">
+          <button class="btn-icon" onclick='openEdit(${JSON.stringify(s)})'>edit</button>
+          <button class="btn-icon danger" onclick="deleteSession(${s.id})">del</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Charts ────────────────────────────────────────────────
+function chartOpts(extra={}) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor:'#1a1a1a', borderColor:'#333', borderWidth:1, titleColor:'#c8a96e', bodyColor:'#e8e8e8', titleFont:{family:'DM Mono'}, bodyFont:{family:'DM Mono'} }
+    },
+    scales: {
+      x: { grid:{color:'#1a1a1a'}, ticks:{color:'#555', font:{family:'DM Mono',size:10}} },
+      y: { grid:{color:'#1a1a1a'}, ticks:{color:'#555', font:{family:'DM Mono',size:10}}, beginAtZero:true }
+    },
+    ...extra
+  };
+}
+
+function renderCharts() {
+  const months = Object.keys(stats.monthly_sessions||{}).sort();
+  if (charts.monthly) charts.monthly.destroy();
+  charts.monthly = new Chart(document.getElementById('chartMonthly'), {
+    type:'bar',
+    data:{ labels:months, datasets:[{ data:months.map(m=>stats.monthly_sessions[m]), backgroundColor:'rgba(200,169,110,0.7)', borderColor:'rgba(200,169,110,1)', borderWidth:1, borderRadius:3 }] },
+    options: chartOpts()
+  });
+
+  const activeBelts = BELT_ORDER.filter(b => stats.belt_counts?.[b] > 0);
+  if (charts.belt) charts.belt.destroy();
+  charts.belt = new Chart(document.getElementById('chartBelt'), {
+    type:'doughnut',
+    data:{ labels:activeBelts, datasets:[{ data:activeBelts.map(b=>stats.belt_counts[b]), backgroundColor:activeBelts.map(b=>BELT_COLORS[b]), borderWidth:2, borderColor:'#111' }] },
+    options:{ ...chartOpts(), cutout:'65%', scales:{x:{display:false},y:{display:false}} }
+  });
+
+  const rollBelts = BELT_ORDER.filter(b => (stats.rolls_by_belt?.[b]||0) > 0);
+  if (charts.rolls) charts.rolls.destroy();
+  charts.rolls = new Chart(document.getElementById('chartRolls'), {
+    type:'doughnut',
+    data:{ labels:rollBelts, datasets:[{ data:rollBelts.map(b=>stats.rolls_by_belt[b]), backgroundColor:rollBelts.map(b=>BELT_COLORS[b]), borderWidth:2, borderColor:'#111' }] },
+    options:{ ...chartOpts(), cutout:'65%', scales:{x:{display:false},y:{display:false}} }
+  });
+
+  const sorted = [...sessions].sort((a,b)=>a.date.localeCompare(b.date));
+  if (charts.cumulative) charts.cumulative.destroy();
+  charts.cumulative = new Chart(document.getElementById('chartCumulative'), {
+    type:'line',
+    data:{ labels:sorted.map(s=>s.date), datasets:[{ data:sorted.map((_,i)=>i+1), borderColor:'rgba(200,169,110,0.9)', backgroundColor:'rgba(200,169,110,0.08)', fill:true, pointRadius:0, tension:0.3, borderWidth:2 }] },
+    options: chartOpts()
+  });
+}
+
+function renderProgress() {
+  document.getElementById('beltTimeline').innerHTML = BELT_ORDER.map(b => {
+    const reached = !!stats.belt_first_dates?.[b];
+    const count = stats.belt_counts?.[b] || 0;
+    return `
+      <div class="timeline-item">
+        <div class="timeline-line-col">
+          <div class="timeline-dot ${reached?'reached':''}"></div>
+          <div class="timeline-connector"></div>
+        </div>
+        <div class="timeline-content">
+          <div class="timeline-belt-name" style="color:${BELT_COLORS[b]}">${b.toUpperCase()}</div>
+          <div class="timeline-meta">${reached ? `Since ${stats.belt_first_dates[b]} · ${count} session${count!==1?'s':''}` : 'Not yet reached'}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  if (charts.beltProgress) charts.beltProgress.destroy();
+  charts.beltProgress = new Chart(document.getElementById('chartBeltProgress'), {
+    type:'bar',
+    data:{ labels:BELT_ORDER.map(b=>b.charAt(0).toUpperCase()+b.slice(1)), datasets:[{ data:BELT_ORDER.map(b=>stats.belt_counts?.[b]||0), backgroundColor:BELT_ORDER.map(b=>BELT_COLORS[b]+'bb'), borderColor:BELT_ORDER.map(b=>BELT_COLORS[b]), borderWidth:1, borderRadius:3 }] },
+    options: chartOpts()
+  });
+
+  const avgData = BELT_ORDER.map(b => {
+    const count = stats.belt_counts?.[b] || 0;
+    if (!count || !stats.belt_first_dates?.[b]) return 0;
+    const months = Math.max(1, (new Date() - new Date(stats.belt_first_dates[b])) / (1000*60*60*24*30));
+    return Math.round(count / months * 10) / 10;
+  });
+  if (charts.beltAvg) charts.beltAvg.destroy();
+  charts.beltAvg = new Chart(document.getElementById('chartBeltAvg'), {
+    type:'bar',
+    data:{ labels:BELT_ORDER.map(b=>b.charAt(0).toUpperCase()+b.slice(1)), datasets:[{ data:avgData, backgroundColor:'rgba(200,169,110,0.5)', borderColor:'rgba(200,169,110,1)', borderWidth:1, borderRadius:3 }] },
+    options: chartOpts()
+  });
+}
+
+// ── Load data ─────────────────────────────────────────────
+async function loadData() {
+  [sessions, stats] = await Promise.all([api('/sessions'), api('/stats')]);
+  updateHeader(stats);
+  updateStats(stats);
+  renderHistory();
+}
+
+async function init() {
+  await loadInstructors();
+  await loadData();
+}
+
+init();
+</script>
+</body>
+</html>

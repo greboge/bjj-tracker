@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  bjj-tracker:
+    image: ghcr.io/greboge/bjj-tracker:latest
+    container_name: bjj-tracker
+    restart: unless-stopped
+    ports:
+      - "8765:8000"
+    volumes:
+      - bjj-tracker-data:/data
+
+volumes:
+  bjj-tracker-data:
